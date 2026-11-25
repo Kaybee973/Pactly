@@ -3,6 +3,10 @@ import { stellarExplorerContractUrl, stellarExplorerTransactionUrl, trustlessWor
 export interface EscrowProofProps {
   contractId?: string;
   txHash?: string;
+  /** Issue #157: true once the escrow itself has released the deposit. */
+  released?: boolean;
+  /** Issue #157: the release transaction's hash, when one was stored. */
+  releaseTxHash?: string | null;
 }
 
 /** DESIGN.md's `Escrow proof`: a secondary mono label under the funded
@@ -13,7 +17,7 @@ export interface EscrowProofProps {
  * Viewer (roles, milestones, balances read straight from its read model).
  * Always secondary evidence, never a competing CTA -- rendered as plain
  * text and links, never a button. */
-export function EscrowProof({ contractId, txHash }: EscrowProofProps) {
+export function EscrowProof({ contractId, txHash, released = false, releaseTxHash }: EscrowProofProps) {
   return (
     <p className="escrow-proof">
       <span>DEPOSIT HELD IN ESCROW BY TRUSTLESS WORK</span>
@@ -27,6 +31,14 @@ export function EscrowProof({ contractId, txHash }: EscrowProofProps) {
           View payment record &#8599;
         </a>
       )}
+      {released &&
+        (releaseTxHash ? (
+          <a href={stellarExplorerTransactionUrl(releaseTxHash)} target="_blank" rel="noreferrer">
+            View release transaction &#8599;
+          </a>
+        ) : (
+          <span>Release transaction not recorded yet</span>
+        ))}
       {contractId && (
         <a href={trustlessWorkViewerUrl(contractId)} target="_blank" rel="noreferrer">
           View in Escrow Viewer &#8599;
