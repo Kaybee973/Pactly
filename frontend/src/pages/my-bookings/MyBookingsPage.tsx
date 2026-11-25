@@ -108,6 +108,7 @@ export function MyBookingsPage() {
               holdReleasedReason={booking.holdReleasedReason}
               contractId={booking.contractId}
               balancePaymentTxHash={booking.balancePaymentTxHash}
+              receivingAddress={booking.receivingAddress}
               session={session}
               onActionSubmitted={() => bookingsQuery.refetch()}
               onUnauthorized={handleSignOut}
@@ -144,6 +145,7 @@ export function MyBookingsPage() {
                 serverTime={booking.serverTime}
                 contractId={booking.contractId}
                 balancePaymentTxHash={booking.balancePaymentTxHash}
+                receivingAddress={booking.receivingAddress}
                 session={session}
                 onActionSubmitted={() => bookingsQuery.refetch()}
                 onUnauthorized={handleSignOut}

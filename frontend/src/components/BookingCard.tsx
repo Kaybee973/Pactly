@@ -68,6 +68,9 @@ export interface BookingCardProps {
   declinedAt?: number | null;
   /** Provider view only: shows "Decline hold" for a live, unlocked hold. */
   canDecline?: boolean;
+  /** Issue #158: the shop's stored receiving address, passed through to
+   * {@link BookingActions}. */
+  receivingAddress?: string | null;
 }
 
 /** The balance row's own three-state wording (Epic 3 context: "Balance
@@ -113,6 +116,7 @@ export function BookingCard({
   shopName,
   declinedAt,
   canDecline,
+  receivingAddress,
 }: BookingCardProps) {
   const declined = declinedAt != null;
   const releaseMailto =
@@ -216,6 +220,7 @@ export function BookingCard({
         cancelDeadline={cancelDeadline}
         serverTime={serverTime}
         session={session}
+        receivingAddress={receivingAddress}
         onActionSubmitted={onActionSubmitted}
         onUnauthorized={onUnauthorized}
       />

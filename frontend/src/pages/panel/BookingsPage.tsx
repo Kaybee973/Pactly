@@ -220,6 +220,7 @@ export function BookingsPage() {
                         cancelDeadline={booking.cancelDeadline}
                         serverTime={booking.serverTime}
                         session={session}
+                        receivingAddress={booking.receivingAddress}
                         onActionSubmitted={() => bookingsQuery.refetch()}
                         onUnauthorized={handleSignOut}
                       />
@@ -264,6 +265,7 @@ export function BookingsPage() {
                 serverTime={booking.serverTime}
                 contractId={booking.contractId}
                 balancePaymentTxHash={booking.balancePaymentTxHash}
+                receivingAddress={booking.receivingAddress}
                 session={session}
                 onActionSubmitted={() => bookingsQuery.refetch()}
                 onUnauthorized={handleSignOut}
@@ -299,6 +301,7 @@ export function BookingsPage() {
                 serverTime={booking.serverTime}
                 contractId={booking.contractId}
                 balancePaymentTxHash={booking.balancePaymentTxHash}
+                receivingAddress={booking.receivingAddress}
                 session={session}
                 onActionSubmitted={() => bookingsQuery.refetch()}
                 onUnauthorized={handleSignOut}

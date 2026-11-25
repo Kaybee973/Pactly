@@ -2058,6 +2058,10 @@ export interface BookingView {
   /** Issue #35: true when this read triggered showing a reminder (appointment
    * day-before notice). False when already shown or conditions not met. */
   reminderShown: boolean;
+  /** Issue #158: the address stored for this booking's shop -- the escrow's
+   * own receiver, shown (and copyable) on the booking for both sides.
+   * `null` only when the shop's profile cannot be found. */
+  receivingAddress: string | null;
 }
 
 /** `GET /bookings/:id`'s own response shape: the booking's amounts (each
@@ -2135,6 +2139,7 @@ export async function getBookingView(
     balancePaymentTxHash: booking.balancePaymentTxHash,
     note: booking.note,
     reminderShown,
+    receivingAddress: profile?.walletAddress ?? null,
     disputeOpenedByWallet,
   };
 }
@@ -2407,6 +2412,9 @@ export interface BookingListItemBase {
   /** UTC epoch seconds -- when the provider marked the client as arrived,
    * `null` until marked. */
   arrivedAt: number | null;
+  /** Issue #158: the address stored for this booking's shop, which is what
+   * the escrow releases to. `null` only when the shop's profile is gone. */
+  receivingAddress: string | null;
 }
 
 export interface ClientBookingListItem extends BookingListItemBase {
@@ -2528,6 +2536,7 @@ export async function listBookingsForClient(
       provider: profile
         ? { id: profile.id, displayName: profile.displayName, title: profile.title }
         : { id: booking.providerProfileId, displayName: "", title: "" },
+      receivingAddress: profile?.walletAddress ?? null,
     };
   });
   items.sort((a, b) => compareByAppointmentDate(a, b, now));
@@ -2581,6 +2590,7 @@ export async function listBookingsForProvider(
     ...toBookingListItemBase(booking, slotStartsAt, lifecycleByBooking.get(booking.id), now, remindersShown.has(booking.id)),
     clientWalletAddress: booking.clientWalletAddress,
     clientEmail: booking.clientEmail ?? null,
+    receivingAddress: profile.walletAddress,
   }));
   items.sort((a, b) => compareByAppointmentDate(a, b, now));
   return items;
