@@ -80,7 +80,7 @@ export function BookingsPage() {
           title="Bookings"
           lede="Sign in to see your incoming bookings."
         />
-        <SignInPanel onSignedIn={setSession} />
+        <SignInPanel onSignedIn={setSession} onRateLimited={(waitMs) => setError(`Too many failed sign-in attempts. Please wait ${Math.ceil(waitMs / 1000)} second${Math.ceil(waitMs / 1000) !== 1 ? "s" : ""} before trying again.`)} />
       </div>
     );
   }
@@ -166,6 +166,11 @@ export function BookingsPage() {
                     <td className="tabular-nums">{shortenStellarId(booking.clientWalletAddress)}</td>
                     <td className="tabular-nums">
                       <TryAmount amount={booking.deposit.amount} />
+                      {booking.anchorTransactionId && (
+                        <div style={{ overflowWrap: "anywhere", userSelect: "all" }} title="Bank transfer reference">
+                          Ref: {booking.anchorTransactionId}
+                        </div>
+                      )}
                     </td>
                     <td className="tabular-nums">
                       <TryAmount amount={booking.balance.amount} /> · {BALANCE_STATE_LABEL[booking.balanceState]}
@@ -217,6 +222,7 @@ export function BookingsPage() {
                         balance={booking.balance}
                         balanceState={booking.balanceState}
                         slotStartsAt={booking.slotStartsAt}
+                        disputeDeadline={booking.disputeDeadline}
                         cancelDeadline={booking.cancelDeadline}
                         serverTime={booking.serverTime}
                         session={session}
@@ -255,6 +261,7 @@ export function BookingsPage() {
                 heading="Client id"
                 subheading={shortenStellarId(booking.clientWalletAddress)}
                 slotStartsAt={booking.slotStartsAt}
+                disputeDeadline={booking.disputeDeadline}
                 deposit={booking.deposit}
                 balance={booking.balance}
                 escrowState={booking.escrowState}
@@ -265,7 +272,7 @@ export function BookingsPage() {
                 serverTime={booking.serverTime}
                 contractId={booking.contractId}
                 balancePaymentTxHash={booking.balancePaymentTxHash}
-                receivingAddress={booking.receivingAddress}
+                anchorTransactionId={booking.anchorTransactionId}
                 session={session}
                 onActionSubmitted={() => bookingsQuery.refetch()}
                 onUnauthorized={handleSignOut}
@@ -291,6 +298,7 @@ export function BookingsPage() {
                 heading="Client id"
                 subheading={shortenStellarId(booking.clientWalletAddress)}
                 slotStartsAt={booking.slotStartsAt}
+                disputeDeadline={booking.disputeDeadline}
                 deposit={booking.deposit}
                 balance={booking.balance}
                 escrowState={booking.escrowState}
@@ -301,7 +309,7 @@ export function BookingsPage() {
                 serverTime={booking.serverTime}
                 contractId={booking.contractId}
                 balancePaymentTxHash={booking.balancePaymentTxHash}
-                receivingAddress={booking.receivingAddress}
+                anchorTransactionId={booking.anchorTransactionId}
                 session={session}
                 onActionSubmitted={() => bookingsQuery.refetch()}
                 onUnauthorized={handleSignOut}

@@ -1,7 +1,14 @@
 import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
-import { joinWaitlist, submitShopReport, usePublicProviderProfile } from "../../api/hooks";
+import {
+  joinWaitlist,
+  saveShop,
+  submitShopReport,
+  unsaveShop,
+  useIsShopSaved,
+  usePublicProviderProfile,
+} from "../../api/hooks";
 import { ApiError } from "../../api/client";
 import { DepositPill } from "../../components/DepositPill";
 import { ProviderHeader } from "../../components/ProviderHeader";
@@ -19,9 +26,14 @@ import { getSession, type Session } from "../../wallet";
 export function ProviderProfilePage() {
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: profile, isLoading, error } = usePublicProviderProfile(id);
-  
   const [session] = useState<Session | undefined>(() => getSession());
+  const { data: profile, isLoading, error } = usePublicProviderProfile(id, session?.token);
+
+  const { data: savedData, refetch: refetchSaved } = useIsShopSaved(id, session);
+  const [savingState, setSavingState] = useState<"idle" | "saving" | "unsaving">("idle");
+  const [saveNotice, setSaveNotice] = useState<string | undefined>();
+  const isSaved = savedData?.isSaved ?? false;
+
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
@@ -80,6 +92,9 @@ export function ProviderProfilePage() {
       }
     } finally {
       setSavingState("idle");
+    }
+  }
+
   async function handleReportSubmit(): Promise<void> {
     if (!session || !id) return;
     
@@ -181,11 +196,41 @@ export function ProviderProfilePage() {
     return null;
   }
 
-const dayGroups = groupSlotsByDay(profile.slots);
+  // Issue #140: signed-in shop owner sees explanation page if suspended by admin
+  if (profile.isSuspended) {
+    return (
+      <div className="page">
+        <ProviderHeader
+          displayName={profile.displayName}
+          title={profile.title}
+          location={profile.location}
+          categoryName={profile.category.name}
+          isApproved={profile.isApproved}
+          verifiedSessionCount={profile.verifiedSessionCount}
+          providerCancellationCount={profile.providerCancellationCount}
+          photoSrc={providerPhotoSrc(profile.id)}
+        />
+        <div className="banner banner--alert" style={{ marginTop: "var(--space-6)" }}>
+          <h2>This shop has been suspended by an administrator</h2>
+          {profile.suspensionReason && (
+            <p style={{ marginTop: "var(--space-2)" }}>Reason: {profile.suspensionReason}</p>
+          )}
+          <p style={{ marginTop: "var(--space-2)" }}>
+            New bookings are disabled.
+          </p>
+          <p style={{ marginTop: "var(--space-4)" }}>
+            <Link to="/me/provider">Manage your provider profile</Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const dayGroups = groupSlotsByDay(profile.slots);
   
   const canSave = session && profile.isApproved;
   const canReport = session && profile.isApproved;
-  const canWaitlist = session && profile.isApproved;
+  const canWaitlist = session && profile.isApproved && !profile.bookingsPaused;
 
   return (
     <div className="page">
@@ -199,6 +244,12 @@ const dayGroups = groupSlotsByDay(profile.slots);
         providerCancellationCount={profile.providerCancellationCount}
         photoSrc={providerPhotoSrc(profile.id)}
       />
+
+      {profile.bookingsPaused && (
+        <div className="banner banner--notice" style={{ marginTop: "var(--space-4)" }}>
+          <p>This shop has paused new bookings.</p>
+        </div>
+      )}
 
       {canSave && (
         <div style={{ marginTop: "var(--space-4)", display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
@@ -214,6 +265,9 @@ const dayGroups = groupSlotsByDay(profile.slots);
             {savingState === "idle" && (isSaved ? "★ Saved" : "☆ Save shop")}
           </button>
           {saveNotice && <span style={{ fontSize: "var(--text-14)", color: "var(--color-text-secondary)" }}>{saveNotice}</span>}
+        </div>
+      )}
+
       {canReport && (
         <div style={{ marginTop: "var(--space-4)" }}>
           <button
@@ -252,41 +306,43 @@ const dayGroups = groupSlotsByDay(profile.slots);
           />
         </div>
 
-        <div style={{ marginTop: "var(--space-6)" }}>
-          <h2 style={{ fontSize: "var(--text-18)" }}>Upcoming slots · {profile.timezone}</h2>
-          {dayGroups.length === 0 ? (
-            <p className="banner">No open slots in the next 30 days. Check back soon.</p>
-          ) : (
-            dayGroups.map((group) => (
-              <div className="slot-day" key={group.dayLabel}>
-                <div className="slot-day__label">{group.dayLabel}</div>
-                <div className="slot-day__chips">
-                  {group.slots.map((startsAt) => (
-                    <SlotChip
-                      key={startsAt}
-                      startsAt={startsAt}
-                      selected={startsAt === selectedSlot}
-                      onSelect={selectSlot}
-                      timeZone={profile.timezone}
-                    />
-                  ))}
-                  {group.slots.length === 0 && canWaitlist && (
-                    <button
-                      type="button"
-                      className="button-secondary"
-                      style={{ fontSize: "var(--text-14)" }}
-                      onClick={() => openWaitlistDialog(group.dateISO)}
-                    >
-                      Join waitlist
-                    </button>
-                  )}
+        {!profile.bookingsPaused && (
+          <div style={{ marginTop: "var(--space-6)" }}>
+            <h2 style={{ fontSize: "var(--text-18)" }}>Upcoming slots · {profile.timezone}</h2>
+            {dayGroups.length === 0 ? (
+              <p className="banner">No open slots in the next 30 days. Check back soon.</p>
+            ) : (
+              dayGroups.map((group) => (
+                <div className="slot-day" key={group.dayLabel}>
+                  <div className="slot-day__label">{group.dayLabel}</div>
+                  <div className="slot-day__chips">
+                    {group.slots.map((startsAt) => (
+                      <SlotChip
+                        key={startsAt}
+                        startsAt={startsAt}
+                        selected={startsAt === selectedSlot}
+                        onSelect={selectSlot}
+                        timeZone={profile.timezone}
+                      />
+                    ))}
+                    {group.slots.length === 0 && canWaitlist && (
+                      <button
+                        type="button"
+                        className="button-secondary"
+                        style={{ fontSize: "var(--text-14)" }}
+                        onClick={() => openWaitlistDialog(group.dateISO)}
+                      >
+                        Join waitlist
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        )}
 
-        {selectedSlot !== undefined && (
+        {!profile.bookingsPaused && selectedSlot !== undefined && (
           <div style={{ marginTop: "var(--space-6)" }}>
             <Link to={`/book/${profile.id}?slot=${selectedSlot}`} className="button-primary" style={{ textDecoration: "none" }}>
               Continue
@@ -295,29 +351,6 @@ const dayGroups = groupSlotsByDay(profile.slots);
         )}
       </div>
 
-      {/* Issue #3: verified reviews, newest first (the backend already
-       * orders them). An empty list stays empty -- there is no placeholder
-       * rating and never a fabricated one. Each review links back to the
-       * booking it came from, in the client's own bookings list. */}
-      <section className="card" style={{ marginTop: "var(--space-6)" }}>
-        <h2 style={{ fontSize: "var(--text-18)" }}>Reviews</h2>
-        {profile.reviews.length === 0 ? (
-          <p className="banner">No reviews yet.</p>
-        ) : (
-          <ul className="review-list">
-            {profile.reviews.map((review) => (
-              <li key={review.id} className="review-list__item">
-                <p className="review-list__rating">{review.rating} out of 5</p>
-                {review.comment && <p className="review-list__comment">{review.comment}</p>}
-                <p className="review-list__meta">
-                  {formatSlotDay(review.createdAt)} ·{" "}
-                  <Link to={`/me/bookings#booking-${review.bookingId}`}>View the booking</Link>
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
       {showReportDialog && (
         <div className="modal-overlay" onClick={() => setShowReportDialog(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
