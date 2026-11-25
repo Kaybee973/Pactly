@@ -46,25 +46,37 @@ export function DiscoverPage() {
   const categoriesReady = categoriesQuery.isSuccess;
 
   const requestedSlug = searchParams.get("category") ?? undefined;
-  const knownCategorySlugs = useMemo(() => categories.map((category) => category.slug), [categories]);
-  // Issue #156: category, neighbourhood, the sort and the searched words are
-  // all read back from the URL by one parser, so a shared link, the back
-  // button and the first load restore exactly the same view. A slug is only
-  // ever resolved once the real category list is in -- before that the
-  // known list is empty and every slug would wrongly look "unknown".
-  const filters = useMemo(
-    () => readDiscoverFilters(searchParams, categoriesReady ? knownCategorySlugs : []),
-    [searchParams, categoriesReady, knownCategorySlugs],
-  );
-  const selectedSlug = filters.category;
-  const q = filters.q;
-  const formats = filters.formats;
-  const minPrice = filters.minPrice;
-  const maxPrice = filters.maxPrice;
-  const maxDepositBps = filters.maxDepositBps;
-  const availability = filters.when;
-  const neighborhood = filters.neighborhood;
-  const sort = filters.sort;
+  // A slug is only ever resolved once the real category list is in --
+  // before that, `categories` is empty and every slug would wrongly look
+  // "unknown".
+  const selectedSlug = useMemo(() => {
+    if (!requestedSlug || !categoriesReady) {
+      return undefined;
+    }
+    return categories.some((category) => category.slug === requestedSlug) ? requestedSlug : undefined;
+  }, [requestedSlug, categoriesReady, categories]);
+
+  const qRaw = searchParams.get("q") ?? "";
+  // Issue #155: a query of only spaces is treated as empty, so an all-space
+  // URL never filters, never echoes whitespace, and the field reads empty.
+  const q = qRaw.trim() ? qRaw : "";
+  const formats = searchParams.getAll("format");
+  const minPriceRaw = searchParams.get("minPrice");
+  const minPrice = minPriceRaw !== null && NON_NEGATIVE_INTEGER_STRING.test(minPriceRaw) ? minPriceRaw : undefined;
+  const maxPriceRaw = searchParams.get("maxPrice");
+  const maxPrice = maxPriceRaw !== null && NON_NEGATIVE_INTEGER_STRING.test(maxPriceRaw) ? maxPriceRaw : undefined;
+  const maxDepositBpsRaw = searchParams.get("maxDepositBps");
+  const maxDepositBpsParsed =
+    maxDepositBpsRaw !== null && /^\d+$/.test(maxDepositBpsRaw) ? Number(maxDepositBpsRaw) : undefined;
+  const maxDepositBps =
+    maxDepositBpsParsed !== undefined &&
+    maxDepositBpsParsed >= MIN_DEPOSIT_RATE_BPS_FILTER &&
+    maxDepositBpsParsed <= MAX_DEPOSIT_RATE_BPS_FILTER
+      ? maxDepositBpsParsed
+      : undefined;
+  const whenRaw = searchParams.get("when");
+  const availability = whenRaw && AVAILABILITY_VALUES.has(whenRaw as DiscoverAvailability) ? (whenRaw as DiscoverAvailability) : undefined;
+  const sort = searchParams.get("sort") ?? undefined;
 
   function updateParams(mutate: (params: URLSearchParams) => void): void {
     const next = new URLSearchParams(searchParams);
@@ -138,31 +150,14 @@ export function DiscoverPage() {
     });
   }
 
-  function setNeighborhood(next: string): void {
+  function setSort(value: string | undefined): void {
     updateParams((params) => {
-      const trimmed = next.trim();
-      if (trimmed) {
-        params.set("neighborhood", trimmed);
+      if (value) {
+        params.set("sort", value);
       } else {
-        params.delete("neighborhood");
-      }
-    });
-  }
-
-  function setSort(next: DiscoverSort): void {
-    updateParams((params) => {
-      if (next === DEFAULT_DISCOVER_SORT) {
         params.delete("sort");
-      } else {
-        params.set("sort", next);
       }
     });
-  }
-
-  /** Issue #156: one control clears the whole filtered view, category and
-   * searched words included, back to the unfiltered list. */
-  function clearAllFilters(): void {
-    setSearchParams(new URLSearchParams());
   }
 
   function clearFilter(key: string): void {
@@ -201,6 +196,7 @@ export function DiscoverPage() {
       maxPrice,
       maxDepositBps,
       when: availability,
+      sort,
     },
     { enabled: !waitingForCategoryResolution },
   );
@@ -255,8 +251,6 @@ export function DiscoverPage() {
     onMaxDepositBpsChange: setMaxDepositBps,
     availability,
     onAvailabilityChange: setAvailability,
-    neighborhood,
-    onNeighborhoodChange: setNeighborhood,
     sort,
     onSortChange: setSort,
   };
